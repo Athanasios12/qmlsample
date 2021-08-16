@@ -1,0 +1,81 @@
+Based on https://mechatronicsblog.com/cross-compile-and-deploy-qt-5-12-for-raspberry-pi/ and
+https://wiki.qt.io/Raspberry_Pi_Beginners_Guide
+
+------------------------------------
+
+PI
+
+1. Install development libraries – [Pi]
+We need to install some development libraries, so the first thing to do is to allow the system to install source packages, for this you only have to uncomment the deb-src line in the /etc/apt/sources.list file, which configures the system repositories. Use your favorite text editor for this, we are using nano in this example.
+
+sudo nano /etc/apt/sources.list
+The next step is to update and install the required development packages.
+
+sudo apt-get update
+sudo apt-get build-dep qt4-x11
+sudo apt-get build-dep libqt5gui5
+sudo apt-get install libudev-dev libinput-dev libts-dev libxcb-xinerama0-dev libxcb-xinerama0
+2. Prepare target folder – [Pi]
+This step just involves creating a folder in our Raspberry Pi for the pi user. This folder (/usr/local/qt5pi) will be used to deploy Qt from our computer to the Raspberry Pi.
+
+sudo mkdir /home/hubertos/raspi/qt5pi
+sudo chown pi:pi /home/hubertos/raspi/qt5pi
+
+------------------------------------
+
+HOST
+
+1. Create working folder and set a toolchain – [Co]
+Create a working folder in your computer and download the toolchain.
+
+mkdir ~/raspi
+cd ~/raspi
+git clone https://github.com/raspberrypi/tools
+2. Create and configure a sysroot – [Co]
+A sysroot is a directory structure that includes all the folders needed to run a particular system. We are creating here a sysroot for Raspberry Pi cross compilation in our computer.
+
+mkdir sysroot sysroot/usr sysroot/opt
+We can use rsync to synchronize our computer sysroot and the Raspberry Pi. So, if we make changes in our computer sysroot, they can be easily transferred to our Raspberry Pi; raspberrypi_ip is the network interface name or IP address of your Raspberry Pi.
+
+rsync -avz pi@raspberrypi_ip:/lib sysroot
+rsync -avz pi@raspberrypi_ip:/usr/include sysroot/usr
+rsync -avz pi@raspberrypi_ip:/usr/lib sysroot/usr
+rsync -avz pi@raspberrypi_ip:/opt/vc sysroot/opt
+Next, we need to adjust our symbolic links in sysroot to be relative since this folder structure is in both our computer and Raspberry Pi.
+
+wget https://raw.githubusercontent.com/riscv/riscv-poky/master/scripts/sysroot-relativelinks.py
+chmod +x sysroot-relativelinks.py
+./sysroot-relativelinks.py sysroot
+
+
+3. Clone and init the Qt5 repository:
+git clone git://code.qt.io/qt/qt5.git checkout branch 5.9
+4. Init and update each submodule that will be needed - qmlquick, qmlqcuickcontrols/2, qtbase, qtdeclarative, qtxmlpatterns, qtsvg
+5. Run ./confugure 
+
+Command line: -release -opengl es2 -device linux-rasp-pi3-g++ -device-option 
+CROSS_COMPILE=/home/hubertos/crosscompile-tools/tools/arm-bcm2708/gcc-linaro-arm-linux-gnueabihf-raspbian-x64/bin/arm-linux-gnueabihf- 
+-sysroot /home/hubertos/sysroot -opensource -confirm-license -make libs -prefix /usr/local/qt5pi 
+-extprefix /home/hubertos/raspi/qt5pi -hostprefix /home/hubertos/raspi/qt5 
+-no-use-gold-linker -v -no-gbm -I/home/hubertos/sysroot/opt/vc/include -L/home/hubertos/sysroot/opt/vc/lib
+
+
+
+7. Compile, install and deploy Qt – [Co]
+The exact compilation time depends on your computer performance. This process can take up to 2 or 3 hours in nowadays common computers. Compiler processes can be executed in parallel by means of the j flag. For four make processes, execute: make -j 4.
+
+make
+make install
+Once Qt is compiled, it can be deployed to your Raspberry Pi using the rsync command.
+
+rsync -avz qt5pi pi@raspberrypi_ip:/usr/local
+
+-----------------------------
+
+COMMUNICATION
+
+ssh with rpi to turn on vncserver - ssh pi@192.168.1.XXX
+
+vnc connection with remmina desktop client
+gdbserver run on rpi and gdb from cmd on  - https://www.thegeekstuff.com/2014/04/gdbserver-example/
+
